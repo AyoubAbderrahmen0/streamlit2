@@ -2,13 +2,21 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 
-# %% [2] Charger le modèle et les encoders
-model = joblib.load("rf_model.pkl")
+# %% [2] Vérifier l'existence des fichiers
+required_files = ["rf_model_optimized.pkl", "label_encoders.pkl", "target_encoder.pkl"]
+for f in required_files:
+    if not os.path.exists(f):
+        st.error(f"Fichier manquant : {f}")
+        st.stop()
+
+# %% [3] Charger le modèle et les encoders
+model = joblib.load("rf_model_optimized.pkl")
 label_encoders = joblib.load("label_encoders.pkl")
 target_encoder = joblib.load("target_encoder.pkl")
 
-# %% [3] Interface utilisateur Streamlit
+# %% [4] Interface utilisateur Streamlit
 st.title("Prédiction d'un compte bancaire")
 
 with st.form("user_input"):
@@ -27,20 +35,35 @@ with st.form("user_input"):
 
     submitted = st.form_submit_button("Prédire")
 
-# %% [4] Faire la prédiction
+# %% [5] Faire la prédiction
 if submitted:
+    # Grouper l'age et la taille du ménage comme pendant l'entraînement
+    if age_of_respondent <= 30:
+        age_group = 0
+    elif age_of_respondent <= 50:
+        age_group = 1
+    else:
+        age_group = 2
+
+    if household_size <= 3:
+        household_group = 0
+    elif household_size <= 6:
+        household_group = 1
+    else:
+        household_group = 2
+
     input_data = pd.DataFrame({
         'country': [label_encoders['country'].transform([country])[0]],
         'year': [year],
         'location_type': [label_encoders['location_type'].transform([location_type])[0]],
         'cellphone_access': [label_encoders['cellphone_access'].transform([cellphone_access])[0]],
-        'household_size': [household_size],
-        'age_of_respondent': [age_of_respondent],
         'gender_of_respondent': [label_encoders['gender_of_respondent'].transform([gender_of_respondent])[0]],
         'relationship_with_head': [label_encoders['relationship_with_head'].transform([relationship_with_head])[0]],
         'marital_status': [label_encoders['marital_status'].transform([marital_status])[0]],
         'education_level': [label_encoders['education_level'].transform([education_level])[0]],
-        'job_type': [label_encoders['job_type'].transform([job_type])[0]]
+        'job_type': [label_encoders['job_type'].transform([job_type])[0]],
+        'age_group': [age_group],
+        'household_group': [household_group]
     })
 
     prediction = model.predict(input_data)

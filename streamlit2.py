@@ -11,39 +11,28 @@ import seaborn as sns
 
 # %% [2] Charger les données
 df = pd.read_csv("Financial_inclusion_dataset.csv")
-print("Shape:", df.shape)
-print(df.head())
-print(df.info())
-print(df.describe())
-
-# %% [3] Vérifier doublons et valeurs manquantes
 df.drop_duplicates(inplace=True)
-print("Valeurs manquantes par colonne:\n", df.isnull().sum())
 
-# %% [4] Remplacer valeurs manquantes
+# %% [3] Remplacer valeurs manquantes
 categorical_cols = ['country', 'location_type', 'cellphone_access', 'gender_of_respondent',
                     'relationship_with_head', 'marital_status', 'education_level', 'job_type']
 
 for col in categorical_cols:
-    mode_val = df[col].mode()[0]
-    df[col].fillna(mode_val, inplace=True)
+    df[col].fillna(df[col].mode()[0], inplace=True)
 
-# Colonne numérique
 df['age_of_respondent'].fillna(df['age_of_respondent'].mean(), inplace=True)
 
-# %% [5] Gestion des outliers
+# %% [4] Gestion des outliers
 df['age_of_respondent'] = np.clip(df['age_of_respondent'], 16, 100)
 df['household_size'] = np.clip(df['household_size'], 1, 20)
 
-# %% [6] Feature Engineering simple
-# Grouper l'age
+# %% [5] Feature Engineering simple
 df['age_group'] = pd.cut(df['age_of_respondent'], bins=[15,30,50,100], labels=[0,1,2])
-# Taille ménage
 df['household_group'] = pd.cut(df['household_size'], bins=[0,3,6,20], labels=[0,1,2])
 
 categorical_cols += ['age_group', 'household_group']
 
-# %% [7] Encodage des variables catégoriques
+# %% [6] Encodage des variables catégoriques
 label_encoders = {}
 for col in categorical_cols:
     le = LabelEncoder()
@@ -54,13 +43,13 @@ for col in categorical_cols:
 target_le = LabelEncoder()
 df['bank_account'] = target_le.fit_transform(df['bank_account'])
 
-# %% [8] Préparation des données pour ML
+# %% [7] Préparation des données pour ML
 X = df.drop(['uniqueid', 'bank_account', 'age_of_respondent', 'household_size'], axis=1)
 y = df['bank_account']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-# %% [9] RandomForest avec hyperparam tuning
+# %% [8] RandomForest avec hyperparam tuning
 param_grid = {
     'n_estimators': [200, 300, 500],
     'max_depth': [10, 20, 30, None],
@@ -77,22 +66,13 @@ rf_search.fit(X_train, y_train)
 
 best_model = rf_search.best_estimator_
 
-# %% [10] Evaluation
+# %% [9] Evaluation
 y_pred = best_model.predict(X_test)
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print(classification_report(y_test, y_pred))
 
-# %% [11] Importance des features
-importances = best_model.feature_importances_
-plt.figure(figsize=(10,6))
-sns.barplot(x=importances, y=X.columns)
-plt.title("Feature Importances")
-plt.show()
-
-# %% [12] Sauvegarder le modèle
+# %% [10] Sauvegarder le modèle et les encoders
 joblib.dump(best_model, "rf_model_optimized.pkl")
+joblib.dump(label_encoders, "label_encoders.pkl")
+joblib.dump(target_le, "target_encoder.pkl")
 print("Modèle et encoders sauvegardés !")
-
-#%%
-import os
-print(os.path.getsize("rf_model_optimized.pkl") / 1024**2, "MB")
